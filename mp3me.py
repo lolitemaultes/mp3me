@@ -79,6 +79,7 @@ APP_VERSION = "1.2.0"
 DEFAULT_THREADS = 3
 DEFAULT_FORMAT = "mp3"
 SUPPORTED_FORMATS = ["mp3", "flac", "wav", "ogg", "m4a"]
+DEFAULT_ACCENT_COLOR = "#4d8ffd"
 THUMBNAIL_SIZE = 150  # Size for album/artist thumbnails
 SETTINGS_FILE = "ytmusic_downloader_settings.json"
 MAX_CACHE_SIZE_MB = 500  # Maximum size for thumbnail cache in MB
@@ -110,9 +111,9 @@ os.makedirs(RESOURCES_DIR, exist_ok=True)
 
 class DarkTheme:
     """Class to handle dark theme styling for the application"""
-    
+
     @staticmethod
-    def apply_to(app):
+    def apply_to(app, accent_color=DEFAULT_ACCENT_COLOR):
         """Apply dark theme to the application"""
         try:
             # Look for custom style file first
@@ -122,10 +123,11 @@ class DarkTheme:
             # Check if style file exists and create it if needed
             if not os.path.exists(style_file):
                 DarkTheme._create_default_stylesheet(style_file)
-                
+
             # Apply the stylesheet
             with open(style_file, "r") as f:
                 style = f.read()
+                style = DarkTheme._process_style(style, accent_color)
                 app.setStyleSheet(style)
                 
             logger.info("Dark theme applied successfully")
@@ -134,6 +136,19 @@ class DarkTheme:
         except Exception as e:
             logger.error(f"Error applying dark theme: {e}")
             return False
+
+    @staticmethod
+    def _process_style(style: str, accent_color: str) -> str:
+        """Replace placeholder colors with the selected accent color."""
+        base = QColor(accent_color)
+        light = base.lighter(120).name()
+        dark = base.darker(120).name()
+        darker = base.darker(160).name()
+        style = style.replace("{ACCENT_COLOR}", accent_color)
+        style = style.replace("{ACCENT_LIGHT}", light)
+        style = style.replace("{ACCENT_DARK}", dark)
+        style = style.replace("{ACCENT_DARKER}", darker)
+        return style
     
     @staticmethod
     def _create_default_stylesheet(file_path):
@@ -155,7 +170,7 @@ class DarkTheme:
         }
         
         QSplitter::handle:hover {
-            background-color: #4a9eff;
+            background-color: {ACCENT_LIGHT};
         }
         
         /* Tab Widget Styling */
@@ -198,12 +213,12 @@ class DarkTheme:
             background: #1a1a1a;
             color: #ffffff;
             font-weight: bold;
-            border-bottom: 2px solid #4d8ffd;
+            border-bottom: 2px solid {ACCENT_COLOR};
         }
         
         /* Button Styling */
         QPushButton {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4d8ffd, stop:1 #3a78e8);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {ACCENT_COLOR}, stop:1 {ACCENT_DARK});
             color: #ffffff;
             padding: 10px 18px;
             border: 1px solid #2a2a2a;
@@ -214,11 +229,11 @@ class DarkTheme:
         }
         
         QPushButton:hover {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5ca8ff, stop:1 #4a85f0);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {ACCENT_LIGHT}, stop:1 {ACCENT_COLOR});
         }
         
         QPushButton:pressed {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a78e8, stop:1 #3670d8);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {ACCENT_DARK}, stop:1 {ACCENT_DARKER});
             padding-top: 11px;
             padding-bottom: 9px;
         }
@@ -235,12 +250,12 @@ class DarkTheme:
             padding: 10px 14px;
             border: 2px solid #333333;
             border-radius: 8px;
-            selection-background-color: #4d8ffd;
+            selection-background-color: {ACCENT_COLOR};
             selection-color: #ffffff;
         }
         
         QLineEdit:focus {
-            border-color: #4d8ffd;
+            border-color: {ACCENT_COLOR};
             background-color: #2a2a2a;
         }
         
@@ -262,7 +277,7 @@ class DarkTheme:
         }
         
         QProgressBar::chunk {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4d8ffd, stop:1 #3a78e8);
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {ACCENT_COLOR}, stop:1 {ACCENT_DARK});
             border-radius: 6px;
         }
         
@@ -296,7 +311,7 @@ class DarkTheme:
         }
         
         QScrollBar::handle:hover {
-            background-color: #4d8ffd;
+            background-color: {ACCENT_COLOR};
         }
         
         QScrollBar::add-line, QScrollBar::sub-line {
@@ -324,7 +339,7 @@ class DarkTheme:
         }
         
         QComboBox:on {
-            border-color: #4d8ffd;
+            border-color: {ACCENT_COLOR};
         }
         
         QComboBox::drop-down {
@@ -335,7 +350,7 @@ class DarkTheme:
         QComboBox QAbstractItemView {
             background-color: #242424;
             color: #ffffff;
-            selection-background-color: #4d8ffd;
+            selection-background-color: {ACCENT_COLOR};
             selection-color: #ffffff;
             border: 1px solid #333333;
             border-radius: 0px 0px 8px 8px;
@@ -372,7 +387,7 @@ class DarkTheme:
         QGroupBox::title {
             subcontrol-origin: margin;
             subcontrol-position: top left;
-            background-color: #4d8ffd;
+            background-color: {ACCENT_COLOR};
             padding: 6px 15px;
             color: #ffffff;
             border-radius: 5px;
@@ -395,12 +410,12 @@ class DarkTheme:
         }
         
         QCheckBox::indicator:hover {
-            border-color: #4d8ffd;
+            border-color: {ACCENT_COLOR};
         }
         
         QCheckBox::indicator:checked {
-            background-color: #4d8ffd;
-            border-color: #4d8ffd;
+            background-color: {ACCENT_COLOR};
+            border-color: {ACCENT_COLOR};
         }
         
         QCheckBox::indicator:unchecked:hover {
@@ -438,7 +453,7 @@ class DarkTheme:
         }
         
         QTableWidget::item:selected {
-            background-color: #4d8ffd;
+            background-color: {ACCENT_COLOR};
             color: #ffffff;
         }
         
@@ -700,6 +715,7 @@ class Settings:
         self.max_cache_size = MAX_CACHE_SIZE_MB
         self.notify_on_complete = True
         self.check_duplicates = True
+        self.accent_color = DEFAULT_ACCENT_COLOR
         self.preferred_language = "en"
         self.load()
     
@@ -721,6 +737,7 @@ class Settings:
                 self.max_cache_size = settings.get('max_cache_size', self.max_cache_size)
                 self.notify_on_complete = settings.get('notify_on_complete', self.notify_on_complete)
                 self.check_duplicates = settings.get('check_duplicates', self.check_duplicates)
+                self.accent_color = settings.get('accent_color', self.accent_color)
                 self.preferred_language = settings.get('preferred_language', self.preferred_language)
                 
                 # Validate the download directory
@@ -751,6 +768,7 @@ class Settings:
             except:
                 # If all else fails, use current directory
                 self.download_dir = os.getcwd()
+        self.accent_color = DEFAULT_ACCENT_COLOR
     
     def save(self):
         """Save settings to file."""
@@ -766,6 +784,7 @@ class Settings:
             'max_cache_size': self.max_cache_size,
             'notify_on_complete': self.notify_on_complete,
             'check_duplicates': self.check_duplicates,
+            'accent_color': self.accent_color,
             'preferred_language': self.preferred_language
         }
         
@@ -1691,7 +1710,7 @@ class FeedbackMessage(QLabel):
         # Style based on type
         self.setStyleSheet("""
             #infoMessage {
-                background-color: #4d8ffd;
+                background-color: {ACCENT_COLOR};
                 color: #ffffff;
                 padding: 10px;
                 border-radius: 5px;
@@ -1992,7 +2011,7 @@ class TrackSelectionDialog(QDialog):
             }
             
             #tracksTable::item:selected {
-                background-color: #4d8ffd;
+                background-color: {ACCENT_COLOR};
                 color: #ffffff;
             }
         """)
@@ -2543,8 +2562,13 @@ class MainWindow(QMainWindow):
         self.dark_mode_checkbox = QCheckBox("Dark Mode")
         self.dark_mode_checkbox.setChecked(self.settings.dark_mode)
         self.dark_mode_checkbox.stateChanged.connect(self.update_settings)
-        
+
         theme_layout.addWidget(self.dark_mode_checkbox)
+
+        self.accent_button = QPushButton("Accent Color")
+        self.accent_button.clicked.connect(self.choose_accent_color)
+        self._update_accent_button()
+        theme_layout.addWidget(self.accent_button)
         
         # Cache
         cache_group = QGroupBox("Cache")
@@ -2596,9 +2620,15 @@ class MainWindow(QMainWindow):
         credits_label.setFont(QFont("", 12, QFont.Weight.Bold))
         
         powered_label = QLabel("Powered by yt-dlp and created by lolitemaultes")
-        
+
         credits_layout.addWidget(credits_label)
         credits_layout.addWidget(powered_label)
+
+        log_button = QPushButton("Open Log File")
+        if QTA_AVAILABLE:
+            log_button.setIcon(qta.icon('fa5s.file-alt'))
+        log_button.clicked.connect(self.open_log_file)
+        credits_layout.addWidget(log_button)
         
         settings_layout.addWidget(credits_group)
         settings_layout.addStretch(1)
@@ -3640,6 +3670,21 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"Download directory changed to: {dir_path}")
             self.feedback_message.show_message(f"Download directory changed to: {dir_path}", FeedbackMessage.SUCCESS)
 
+    def _update_accent_button(self):
+        """Update accent color button appearance."""
+        self.accent_button.setStyleSheet(f"background-color: {self.settings.accent_color}; color: white;")
+
+    def choose_accent_color(self):
+        """Allow user to choose a custom accent color."""
+        color = QColorDialog.getColor(QColor(self.settings.accent_color), self, "Select Accent Color")
+        if color.isValid():
+            self.settings.accent_color = color.name()
+            self._update_accent_button()
+            self.apply_theme()
+            self.settings.save()
+            self.status_bar.showMessage("Accent color updated")
+            self.feedback_message.show_message("Accent color updated", FeedbackMessage.SUCCESS)
+
     def update_settings(self):
         """Update settings when changed in the UI."""
         # Update threads
@@ -3687,7 +3732,7 @@ class MainWindow(QMainWindow):
         """Apply the selected theme."""
         if self.settings.dark_mode:
             # Apply dark theme using QSS
-            DarkTheme.apply_to(QApplication.instance())
+            DarkTheme.apply_to(QApplication.instance(), self.settings.accent_color)
         else:
             # Use default light palette
             QApplication.instance().setStyleSheet("")
@@ -3863,6 +3908,23 @@ class MainWindow(QMainWindow):
                 self.feedback_message.show_message(f"Failed to open folder: {str(e)}", FeedbackMessage.ERROR)
         else:
             self.feedback_message.show_message("File not found", FeedbackMessage.ERROR)
+
+    def open_log_file(self):
+        """Open the application log file."""
+        path = os.path.abspath(LOG_FILE)
+        if os.path.exists(path):
+            try:
+                if platform.system() == "Windows":
+                    os.startfile(path)
+                elif platform.system() == "Darwin":
+                    subprocess.run(["open", path], check=True)
+                else:
+                    subprocess.run(["xdg-open", path], check=True)
+            except Exception as e:
+                logger.error(f"Failed to open log file: {str(e)}")
+                self.feedback_message.show_message(f"Failed to open log file: {str(e)}", FeedbackMessage.ERROR)
+        else:
+            self.feedback_message.show_message("Log file not found", FeedbackMessage.ERROR)
 
     def clear_cache(self):
         """Clear the thumbnail cache."""
@@ -4698,7 +4760,7 @@ def main():
     
     # Load and apply stylesheet
     try:
-        DarkTheme.apply_to(app)
+        DarkTheme.apply_to(app, DEFAULT_ACCENT_COLOR)
     except Exception as e:
         logger.error(f"Error applying stylesheet: {e}")
     
