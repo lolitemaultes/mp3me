@@ -2661,6 +2661,8 @@ class MainWindow(QMainWindow):
                 return
         self.exit_requested = True
         self.close()
+        # Ensure the Qt event loop exits even if the window is hidden
+        QApplication.instance().quit()
 
     def update_network_indicator(self, connected: bool):
         """Update the network status indicator."""
