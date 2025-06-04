@@ -2011,6 +2011,9 @@ class MainWindow(QMainWindow):
         
         # Initialize download manager
         self.download_manager = DownloadManager(self.settings, self.signals)
+
+        # Flag to determine if a full exit was requested
+        self.exit_requested = False
         
         # Initialize UI
         self.init_ui()
@@ -2534,11 +2537,11 @@ class MainWindow(QMainWindow):
                 
             # Create tray menu
             tray_menu = QMenu()
-            
+
             # Show/hide action
-            show_action = QAction("Show/Hide", self)
-            show_action.triggered.connect(self.toggle_window)
-            tray_menu.addAction(show_action)
+            self.show_action = QAction("Hide" if self.isVisible() else "Show", self)
+            self.show_action.triggered.connect(self.toggle_window)
+            tray_menu.addAction(self.show_action)
             
             # Downloads status
             self.downloads_action = QAction("Downloads: 0 active", self)
@@ -2547,10 +2550,10 @@ class MainWindow(QMainWindow):
             
             tray_menu.addSeparator()
             
-            # Exit action
-            exit_action = QAction("Exit", self)
-            exit_action.triggered.connect(self.close)
-            tray_menu.addAction(exit_action)
+            # Quit action
+            quit_action = QAction("Quit", self)
+            quit_action.triggered.connect(self.quit_application)
+            tray_menu.addAction(quit_action)
             
             self.tray_icon.setContextMenu(tray_menu)
             self.tray_icon.activated.connect(self.tray_icon_activated)
@@ -2567,9 +2570,28 @@ class MainWindow(QMainWindow):
         """Toggle window visibility."""
         if self.isVisible():
             self.hide()
+            if hasattr(self, "show_action"):
+                self.show_action.setText("Show")
         else:
             self.show()
             self.activateWindow()
+            if hasattr(self, "show_action"):
+                self.show_action.setText("Hide")
+
+    def quit_application(self):
+        """Request application quit from the tray."""
+        if self.download_manager.active_downloads:
+            reply = QMessageBox.question(
+                self,
+                "Quit Application",
+                "There are active downloads. Quit and cancel them?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        self.exit_requested = True
+        self.close()
 
     def update_network_indicator(self, connected: bool):
         """Update the network status indicator."""
@@ -3807,13 +3829,19 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
+        # Bypass tray minimization if a full exit was requested
+        if getattr(self, 'exit_requested', False):
+            self.download_manager.shutdown()
+            event.accept()
+            return
+
         # If tray icon is enabled and window is being closed to tray
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible() and not QApplication.instance().isSavingSession():
             # Check if there are active downloads
             if self.download_manager.active_downloads:
                 # Ask the user if they want to close or minimize to tray
                 reply = QMessageBox.question(
-                    self, 
+                    self,
                     "Active Downloads", 
                     "There are active downloads. What would you like to do?",
                     QMessageBox.StandardButton.Close | QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Minimize,
@@ -3829,6 +3857,8 @@ class MainWindow(QMainWindow):
                 elif reply == QMessageBox.StandardButton.Minimize:
                     # Minimize to tray
                     self.hide()
+                    if hasattr(self, 'show_action'):
+                        self.show_action.setText('Show')
                     event.ignore()
                     
                     # Show tray message if not already shown
@@ -3846,6 +3876,8 @@ class MainWindow(QMainWindow):
             else:
                 # No active downloads, just minimize to tray
                 self.hide()
+                if hasattr(self, 'show_action'):
+                    self.show_action.setText('Show')
                 event.ignore()
                 
                 # Show tray message if not already shown
@@ -3860,7 +3892,7 @@ class MainWindow(QMainWindow):
         else:
             # Shutdown the download manager
             self.download_manager.shutdown()
-            
+
             # Accept the event
             event.accept()
 
