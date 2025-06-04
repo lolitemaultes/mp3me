@@ -53,8 +53,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QRadioButton, QButtonGroup, QToolButton, QSystemTrayIcon,
                             QSizePolicy, QGraphicsOpacityEffect, QTableWidget,
                             QTableWidgetItem, QHeaderView, QTextEdit, QColorDialog,
-                            QWizard, QWizardPage, QStackedWidget, QStyle,
-                            QDialogButtonBox)
+                            QWizard, QWizardPage, QStackedWidget, QStyle)
 
 # Add qtawesome for better icons
 try:
@@ -2001,14 +2000,13 @@ class TrackSelectionDialog(QDialog):
         return selected_songs
 
 
-class SettingsDialog(QDialog):
-    """Dialog for editing application settings."""
+class SettingsTab(QWidget):
+    """Settings panel displayed as a tab."""
 
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.settings = parent.settings
-        self.setWindowTitle("Settings")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -2180,10 +2178,12 @@ class SettingsDialog(QDialog):
         layout.addWidget(cache_group)
         layout.addWidget(credits_group)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        button_box.accepted.connect(self.save_settings)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        button_layout = QHBoxLayout()
+        button_layout.addStretch(1)
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(self.save_settings)
+        button_layout.addWidget(save_button)
+        layout.addLayout(button_layout)
 
     def _update_accent_button(self):
         self.accent_button.setStyleSheet(f"background-color: {self.settings.accent_color}; color: white;")
@@ -2242,7 +2242,6 @@ class SettingsDialog(QDialog):
 
         self.parent.status_bar.showMessage("Settings updated")
         self.parent.feedback_message.show_message("Settings updated", FeedbackMessage.SUCCESS)
-        self.accept()
 
 
 class MainWindow(QMainWindow):
@@ -2264,8 +2263,8 @@ class MainWindow(QMainWindow):
         # Initialize download manager
         self.download_manager = DownloadManager(self.settings, self.signals)
 
-        # Settings dialog
-        self.settings_dialog = SettingsDialog(self)
+        # Settings tab
+        self.settings_tab = SettingsTab(self)
 
         # Flag to determine if a full exit was requested
         self.exit_requested = False
@@ -2528,6 +2527,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.search_results_tab, "Search Results")
         self.tabs.addTab(self.downloads_tab, "Downloads Queue")
         self.tabs.addTab(self.library_tab, "Library")
+        self.tabs.addTab(self.settings_tab, "Settings")
         
         main_layout.addWidget(self.tabs)
         
@@ -2661,6 +2661,8 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 return
         self.exit_requested = True
+        if hasattr(self, "tray_icon"):
+            self.tray_icon.hide()
         self.close()
         # Ensure the Qt event loop exits even if the window is hidden
         QApplication.instance().quit()
@@ -3575,8 +3577,10 @@ class MainWindow(QMainWindow):
             self.setPalette(QApplication.style().standardPalette())
 
     def open_settings_dialog(self):
-        """Show the settings dialog."""
-        self.settings_dialog.exec()
+        """Switch to the settings tab."""
+        index = self.tabs.indexOf(self.settings_tab)
+        if index != -1:
+            self.tabs.setCurrentIndex(index)
 
     def show_about_dialog(self):
         """Display about information."""
