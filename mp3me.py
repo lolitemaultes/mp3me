@@ -2000,6 +2000,250 @@ class TrackSelectionDialog(QDialog):
         return selected_songs
 
 
+class SettingsDialog(QDialog):
+    """Dialog for editing application settings."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.settings = parent.settings
+        self.setWindowTitle("Settings")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
+
+        # Download directory
+        dir_group = QGroupBox("Download Directory")
+        dir_layout = QHBoxLayout(dir_group)
+
+        self.dir_input = QLineEdit(self.settings.download_dir)
+        self.dir_input.setReadOnly(True)
+
+        browse_button = QPushButton("Browse...")
+        if QTA_AVAILABLE:
+            browse_button.setIcon(qta.icon('fa5s.folder-open'))
+        browse_button.clicked.connect(self.browse_download_dir)
+
+        dir_layout.addWidget(self.dir_input)
+        dir_layout.addWidget(browse_button)
+
+        # Threads
+        threads_group = QGroupBox("Concurrent Downloads")
+        threads_layout = QHBoxLayout(threads_group)
+
+        threads_label = QLabel("Number of download threads:")
+        self.threads_spinbox = QSpinBox()
+        self.threads_spinbox.setMinimum(1)
+        self.threads_spinbox.setMaximum(10)
+        self.threads_spinbox.setValue(self.settings.threads)
+
+        threads_layout.addWidget(threads_label)
+        threads_layout.addWidget(self.threads_spinbox)
+
+        # Format
+        format_group = QGroupBox("Default Output Format")
+        format_layout = QHBoxLayout(format_group)
+
+        format_label = QLabel("Audio format:")
+        self.format_combo = QComboBox()
+        for fmt in SUPPORTED_FORMATS:
+            self.format_combo.addItem(fmt)
+        idx = self.format_combo.findText(self.settings.format)
+        if idx >= 0:
+            self.format_combo.setCurrentIndex(idx)
+
+        format_layout.addWidget(format_label)
+        format_layout.addWidget(self.format_combo)
+
+        # Quality
+        quality_group = QGroupBox("Default Audio Quality")
+        quality_layout = QHBoxLayout(quality_group)
+
+        quality_label = QLabel("Audio quality:")
+        self.quality_combo = QComboBox()
+        self.quality_combo.addItem("High", "high")
+        self.quality_combo.addItem("Medium", "medium")
+        self.quality_combo.addItem("Low", "low")
+
+        index = 0
+        if self.settings.audio_quality == "medium":
+            index = 1
+        elif self.settings.audio_quality == "low":
+            index = 2
+        self.quality_combo.setCurrentIndex(index)
+
+        quality_layout.addWidget(quality_label)
+        quality_layout.addWidget(self.quality_combo)
+
+        # Organization
+        organization_group = QGroupBox("File Organization")
+        organization_layout = QVBoxLayout(organization_group)
+
+        self.auto_rename_checkbox = QCheckBox("Auto-rename files to 'Artist - Title' format")
+        self.auto_rename_checkbox.setChecked(self.settings.auto_rename)
+
+        self.use_album_folders_checkbox = QCheckBox("Organize by artist/album folders")
+        self.use_album_folders_checkbox.setChecked(self.settings.use_album_folders)
+
+        self.check_duplicates_checkbox = QCheckBox("Check for duplicate files before downloading")
+        self.check_duplicates_checkbox.setChecked(self.settings.check_duplicates)
+
+        organization_layout.addWidget(self.auto_rename_checkbox)
+        organization_layout.addWidget(self.use_album_folders_checkbox)
+        organization_layout.addWidget(self.check_duplicates_checkbox)
+
+        # Processing
+        processing_group = QGroupBox("Audio Processing")
+        processing_layout = QVBoxLayout(processing_group)
+
+        self.normalize_audio_checkbox = QCheckBox("Normalize audio volume")
+        self.normalize_audio_checkbox.setChecked(self.settings.normalize_audio)
+
+        processing_layout.addWidget(self.normalize_audio_checkbox)
+
+        # Notifications
+        notifications_group = QGroupBox("Notifications")
+        notifications_layout = QVBoxLayout(notifications_group)
+
+        self.notify_on_complete_checkbox = QCheckBox("Show notification when downloads complete")
+        self.notify_on_complete_checkbox.setChecked(self.settings.notify_on_complete)
+
+        notifications_layout.addWidget(self.notify_on_complete_checkbox)
+
+        # Theme
+        theme_group = QGroupBox("Theme")
+        theme_layout = QHBoxLayout(theme_group)
+
+        self.dark_mode_checkbox = QCheckBox("Dark Mode")
+        self.dark_mode_checkbox.setChecked(self.settings.dark_mode)
+
+        theme_layout.addWidget(self.dark_mode_checkbox)
+
+        self.accent_button = QPushButton("Accent Color")
+        self.accent_button.clicked.connect(self.choose_accent_color)
+        self._update_accent_button()
+        theme_layout.addWidget(self.accent_button)
+
+        # Cache
+        cache_group = QGroupBox("Cache")
+        cache_layout = QVBoxLayout(cache_group)
+
+        cache_size_layout = QHBoxLayout()
+        self.cache_size_label = QLabel(f"Current cache size: {CacheManager.get_cache_size():.2f}MB")
+        cache_size_layout.addWidget(self.cache_size_label)
+
+        clear_cache_button = QPushButton("Clear Cache")
+        if QTA_AVAILABLE:
+            clear_cache_button.setIcon(qta.icon('fa5s.eraser'))
+        clear_cache_button.clicked.connect(self.clear_cache)
+        cache_size_layout.addWidget(clear_cache_button)
+
+        cache_layout.addLayout(cache_size_layout)
+
+        max_cache_layout = QHBoxLayout()
+        max_cache_label = QLabel("Maximum cache size (MB):")
+        self.max_cache_spinbox = QSpinBox()
+        self.max_cache_spinbox.setMinimum(50)
+        self.max_cache_spinbox.setMaximum(2000)
+        self.max_cache_spinbox.setValue(self.settings.max_cache_size)
+        max_cache_layout.addWidget(max_cache_label)
+        max_cache_layout.addWidget(self.max_cache_spinbox)
+        cache_layout.addLayout(max_cache_layout)
+
+        # Credits
+        credits_group = QGroupBox("About")
+        credits_layout = QVBoxLayout(credits_group)
+
+        credits_label = QLabel(f"{APP_NAME} v{APP_VERSION}")
+        credits_label.setFont(QFont("", 12, QFont.Weight.Bold))
+        powered_label = QLabel("Powered by yt-dlp and created by lolitemaultes")
+        credits_layout.addWidget(credits_label)
+        credits_layout.addWidget(powered_label)
+
+        log_button = QPushButton("Open Log File")
+        if QTA_AVAILABLE:
+            log_button.setIcon(qta.icon('fa5s.file-alt'))
+        log_button.clicked.connect(parent.open_log_file)
+        credits_layout.addWidget(log_button)
+
+        # Assemble layout
+        layout.addWidget(dir_group)
+        layout.addWidget(threads_group)
+        layout.addWidget(format_group)
+        layout.addWidget(quality_group)
+        layout.addWidget(organization_group)
+        layout.addWidget(processing_group)
+        layout.addWidget(notifications_group)
+        layout.addWidget(theme_group)
+        layout.addWidget(cache_group)
+        layout.addWidget(credits_group)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.save_settings)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def _update_accent_button(self):
+        self.accent_button.setStyleSheet(f"background-color: {self.settings.accent_color}; color: white;")
+
+    def browse_download_dir(self):
+        path = QFileDialog.getExistingDirectory(self, "Select Download Directory", self.settings.download_dir)
+        if path:
+            self.dir_input.setText(path)
+
+    def choose_accent_color(self):
+        color = QColorDialog.getColor(QColor(self.settings.accent_color), self, "Select Accent Color")
+        if color.isValid():
+            self.settings.accent_color = color.name()
+            self._update_accent_button()
+            self.parent.apply_theme()
+
+    def clear_cache(self):
+        try:
+            files_count = len(os.listdir(CACHE_DIR))
+            for f in os.listdir(CACHE_DIR):
+                file_path = os.path.join(CACHE_DIR, f)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            self.cache_size_label.setText(f"Current cache size: {CacheManager.get_cache_size():.2f}MB")
+            self.parent.status_bar.showMessage(f"Cleared {files_count} cache files")
+            self.parent.feedback_message.show_message(f"Cleared {files_count} cache files", FeedbackMessage.SUCCESS)
+        except Exception as e:
+            logger.error(f"Error clearing cache: {e}")
+            self.parent.feedback_message.show_message(f"Error clearing cache: {str(e)}", FeedbackMessage.ERROR)
+
+    def save_settings(self):
+        new_threads = self.threads_spinbox.value()
+        if new_threads != self.settings.threads:
+            self.settings.threads = new_threads
+            self.parent.threadpool.setMaxThreadCount(new_threads + 2)
+
+        self.settings.download_dir = self.dir_input.text()
+        self.settings.format = self.format_combo.currentText()
+        self.settings.audio_quality = self.quality_combo.currentData()
+
+        self.settings.auto_rename = self.auto_rename_checkbox.isChecked()
+        self.settings.use_album_folders = self.use_album_folders_checkbox.isChecked()
+        self.settings.check_duplicates = self.check_duplicates_checkbox.isChecked()
+
+        self.settings.normalize_audio = self.normalize_audio_checkbox.isChecked()
+        self.settings.notify_on_complete = self.notify_on_complete_checkbox.isChecked()
+        self.settings.max_cache_size = self.max_cache_spinbox.value()
+
+        old_dark = self.settings.dark_mode
+        self.settings.dark_mode = self.dark_mode_checkbox.isChecked()
+
+        self.settings.save()
+
+        if old_dark != self.settings.dark_mode:
+            self.parent.apply_theme()
+
+        self.parent.status_bar.showMessage("Settings updated")
+        self.parent.feedback_message.show_message("Settings updated", FeedbackMessage.SUCCESS)
+        self.accept()
+
+
 class MainWindow(QMainWindow):
     """Main application window."""
     
@@ -2018,6 +2262,9 @@ class MainWindow(QMainWindow):
         
         # Initialize download manager
         self.download_manager = DownloadManager(self.settings, self.signals)
+
+        # Settings dialog
+        self.settings_dialog = SettingsDialog(self)
 
         # Flag to determine if a full exit was requested
         self.exit_requested = False
@@ -2048,6 +2295,16 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle(APP_NAME)
+
+        # Menu bar
+        menubar = self.menuBar()
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(self.open_settings_dialog)
+        menubar.addAction(settings_action)
+
+        about_action = QAction("About", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        menubar.addAction(about_action)
         
         # Set better minimum size to avoid cutoffs
         self.setMinimumSize(1100, 750)  # Increase from current 950, 650
@@ -2265,206 +2522,11 @@ class MainWindow(QMainWindow):
         self.downloaded_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         library_layout.addWidget(self.downloaded_table)
         
-        # Create settings tab
-        self.settings_tab = QWidget()
-        settings_layout = QVBoxLayout(self.settings_tab)
-        settings_layout.setContentsMargins(10, 10, 10, 10)
-        settings_layout.setSpacing(15)
-        
-        # Download directory
-        dir_group = QGroupBox("Download Directory")
-        dir_layout = QHBoxLayout(dir_group)
-        
-        self.dir_input = QLineEdit(self.settings.download_dir)
-        self.dir_input.setReadOnly(True)
-        
-        self.dir_button = QPushButton("Browse...")
-        if QTA_AVAILABLE:
-            self.dir_button.setIcon(qta.icon('fa5s.folder-open'))
-        self.dir_button.clicked.connect(self.browse_download_dir)
-        
-        dir_layout.addWidget(self.dir_input)
-        dir_layout.addWidget(self.dir_button)
-        
-        # Concurrent downloads
-        threads_group = QGroupBox("Concurrent Downloads")
-        threads_layout = QHBoxLayout(threads_group)
-        
-        threads_label = QLabel("Number of download threads:")
-        self.threads_spinbox = QSpinBox()
-        self.threads_spinbox.setMinimum(1)
-        self.threads_spinbox.setMaximum(10)
-        self.threads_spinbox.setValue(self.settings.threads)
-        self.threads_spinbox.valueChanged.connect(self.update_settings)
-        
-        threads_layout.addWidget(threads_label)
-        threads_layout.addWidget(self.threads_spinbox)
-        
-        # Output format
-        format_group = QGroupBox("Default Output Format")
-        format_layout = QHBoxLayout(format_group)
-        
-        format_label = QLabel("Audio format:")
-        self.settings_format_combo = QComboBox()
-        for fmt in SUPPORTED_FORMATS:
-            self.settings_format_combo.addItem(fmt)
-        
-        # Set the current format
-        index = self.settings_format_combo.findText(self.settings.format)
-        if index >= 0:
-            self.settings_format_combo.setCurrentIndex(index)
-        
-        self.settings_format_combo.currentTextChanged.connect(self.update_settings)
-        
-        format_layout.addWidget(format_label)
-        format_layout.addWidget(self.settings_format_combo)
-        
-        # Audio quality
-        quality_group = QGroupBox("Default Audio Quality")
-        quality_layout = QHBoxLayout(quality_group)
-        
-        quality_label = QLabel("Audio quality:")
-        self.settings_quality_combo = QComboBox()
-        self.settings_quality_combo.addItem("High", "high")
-        self.settings_quality_combo.addItem("Medium", "medium")
-        self.settings_quality_combo.addItem("Low", "low")
-        
-        # Set the current quality
-        index = 0  # Default to high
-        if self.settings.audio_quality == "medium":
-            index = 1
-        elif self.settings.audio_quality == "low":
-            index = 2
-        self.settings_quality_combo.setCurrentIndex(index)
-        
-        self.settings_quality_combo.currentIndexChanged.connect(self.update_settings)
-        
-        quality_layout.addWidget(quality_label)
-        quality_layout.addWidget(self.settings_quality_combo)
-        
-        # File organization
-        organization_group = QGroupBox("File Organization")
-        organization_layout = QVBoxLayout(organization_group)
-        
-        self.auto_rename_checkbox = QCheckBox("Auto-rename files to 'Artist - Title' format")
-        self.auto_rename_checkbox.setChecked(self.settings.auto_rename)
-        self.auto_rename_checkbox.stateChanged.connect(self.update_settings)
-        
-        self.use_album_folders_checkbox = QCheckBox("Organize by artist/album folders")
-        self.use_album_folders_checkbox.setChecked(self.settings.use_album_folders)
-        self.use_album_folders_checkbox.stateChanged.connect(self.update_settings)
-        
-        self.check_duplicates_checkbox = QCheckBox("Check for duplicate files before downloading")
-        self.check_duplicates_checkbox.setChecked(self.settings.check_duplicates)
-        self.check_duplicates_checkbox.stateChanged.connect(self.update_settings)
-        
-        organization_layout.addWidget(self.auto_rename_checkbox)
-        organization_layout.addWidget(self.use_album_folders_checkbox)
-        organization_layout.addWidget(self.check_duplicates_checkbox)
-        
-        # Audio processing
-        processing_group = QGroupBox("Audio Processing")
-        processing_layout = QVBoxLayout(processing_group)
-        
-        self.normalize_audio_checkbox = QCheckBox("Normalize audio volume")
-        self.normalize_audio_checkbox.setChecked(self.settings.normalize_audio)
-        self.normalize_audio_checkbox.stateChanged.connect(self.update_settings)
-        
-        processing_layout.addWidget(self.normalize_audio_checkbox)
-        
-        # Notifications
-        notifications_group = QGroupBox("Notifications")
-        notifications_layout = QVBoxLayout(notifications_group)
-        
-        self.notify_on_complete_checkbox = QCheckBox("Show notification when downloads complete")
-        self.notify_on_complete_checkbox.setChecked(self.settings.notify_on_complete)
-        self.notify_on_complete_checkbox.stateChanged.connect(self.update_settings)
-        
-        notifications_layout.addWidget(self.notify_on_complete_checkbox)
-        
-        # Theme
-        theme_group = QGroupBox("Theme")
-        theme_layout = QHBoxLayout(theme_group)
-        
-        self.dark_mode_checkbox = QCheckBox("Dark Mode")
-        self.dark_mode_checkbox.setChecked(self.settings.dark_mode)
-        self.dark_mode_checkbox.stateChanged.connect(self.update_settings)
-
-        theme_layout.addWidget(self.dark_mode_checkbox)
-
-        self.accent_button = QPushButton("Accent Color")
-        self.accent_button.clicked.connect(self.choose_accent_color)
-        self._update_accent_button()
-        theme_layout.addWidget(self.accent_button)
-        
-        # Cache
-        cache_group = QGroupBox("Cache")
-        cache_layout = QVBoxLayout(cache_group)
-        
-        # Cache size
-        cache_size_layout = QHBoxLayout()
-        self.cache_size_label = QLabel(f"Current cache size: {CacheManager.get_cache_size():.2f}MB")
-        cache_size_layout.addWidget(self.cache_size_label)
-        
-        clear_cache_button = QPushButton("Clear Cache")
-        if QTA_AVAILABLE:
-            clear_cache_button.setIcon(qta.icon('fa5s.eraser'))
-        clear_cache_button.clicked.connect(self.clear_cache)
-        cache_size_layout.addWidget(clear_cache_button)
-        
-        cache_layout.addLayout(cache_size_layout)
-        
-        # Max cache size
-        max_cache_layout = QHBoxLayout()
-        max_cache_label = QLabel("Maximum cache size (MB):")
-        self.max_cache_spinbox = QSpinBox()
-        self.max_cache_spinbox.setMinimum(50)
-        self.max_cache_spinbox.setMaximum(2000)
-        self.max_cache_spinbox.setValue(self.settings.max_cache_size)
-        self.max_cache_spinbox.valueChanged.connect(self.update_settings)
-        
-        max_cache_layout.addWidget(max_cache_label)
-        max_cache_layout.addWidget(self.max_cache_spinbox)
-        
-        cache_layout.addLayout(max_cache_layout)
-        
-        # Add groups to settings layout
-        settings_layout.addWidget(dir_group)
-        settings_layout.addWidget(threads_group)
-        settings_layout.addWidget(format_group)
-        settings_layout.addWidget(quality_group)
-        settings_layout.addWidget(organization_group)
-        settings_layout.addWidget(processing_group)
-        settings_layout.addWidget(notifications_group)
-        settings_layout.addWidget(theme_group)
-        settings_layout.addWidget(cache_group)
-        
-        # Credits section
-        credits_group = QGroupBox("About")
-        credits_layout = QVBoxLayout(credits_group)
-        
-        credits_label = QLabel(f"{APP_NAME} v{APP_VERSION}")
-        credits_label.setFont(QFont("", 12, QFont.Weight.Bold))
-        
-        powered_label = QLabel("Powered by yt-dlp and created by lolitemaultes")
-
-        credits_layout.addWidget(credits_label)
-        credits_layout.addWidget(powered_label)
-
-        log_button = QPushButton("Open Log File")
-        if QTA_AVAILABLE:
-            log_button.setIcon(qta.icon('fa5s.file-alt'))
-        log_button.clicked.connect(self.open_log_file)
-        credits_layout.addWidget(log_button)
-        
-        settings_layout.addWidget(credits_group)
-        settings_layout.addStretch(1)
         
         # Add tabs to the main tab widget
         self.tabs.addTab(self.search_results_tab, "Search Results")
         self.tabs.addTab(self.downloads_tab, "Downloads Queue")
         self.tabs.addTab(self.library_tab, "Library")
-        self.tabs.addTab(self.settings_tab, "Settings")
         
         main_layout.addWidget(self.tabs)
         
@@ -3498,81 +3560,6 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(f"Cancelled {total_cancelled} downloads")
         self.feedback_message.show_message(f"Cancelled {total_cancelled} downloads", FeedbackMessage.INFO)
 
-    def browse_download_dir(self):
-        """Browse for download directory."""
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Download Directory", self.settings.download_dir
-        )
-        
-        if dir_path:
-            # Update directory
-            self.settings.download_dir = dir_path
-            self.dir_input.setText(dir_path)
-            
-            # Save settings
-            self.settings.save()
-            
-            # Update status
-            self.status_bar.showMessage(f"Download directory changed to: {dir_path}")
-            self.feedback_message.show_message(f"Download directory changed to: {dir_path}", FeedbackMessage.SUCCESS)
-
-    def _update_accent_button(self):
-        """Update accent color button appearance."""
-        self.accent_button.setStyleSheet(f"background-color: {self.settings.accent_color}; color: white;")
-
-    def choose_accent_color(self):
-        """Allow user to choose a custom accent color."""
-        color = QColorDialog.getColor(QColor(self.settings.accent_color), self, "Select Accent Color")
-        if color.isValid():
-            self.settings.accent_color = color.name()
-            self._update_accent_button()
-            self.apply_theme()
-            self.settings.save()
-            self.status_bar.showMessage("Accent color updated")
-            self.feedback_message.show_message("Accent color updated", FeedbackMessage.SUCCESS)
-
-    def update_settings(self):
-        """Update settings when changed in the UI."""
-        # Update threads
-        new_threads = self.threads_spinbox.value()
-        if new_threads != self.settings.threads:
-            self.settings.threads = new_threads
-            self.threadpool.setMaxThreadCount(new_threads + 2)  # Extra threads for UI tasks
-        
-        # Update format
-        self.settings.format = self.settings_format_combo.currentText()
-        
-        # Update quality
-        self.settings.audio_quality = self.settings_quality_combo.currentData()
-        
-        # Update organization settings
-        self.settings.auto_rename = self.auto_rename_checkbox.isChecked()
-        self.settings.use_album_folders = self.use_album_folders_checkbox.isChecked()
-        self.settings.check_duplicates = self.check_duplicates_checkbox.isChecked()
-        
-        # Update audio processing settings
-        self.settings.normalize_audio = self.normalize_audio_checkbox.isChecked()
-        
-        # Update notification settings
-        self.settings.notify_on_complete = self.notify_on_complete_checkbox.isChecked()
-        
-        # Update cache size
-        self.settings.max_cache_size = self.max_cache_spinbox.value()
-        
-        # Update dark mode
-        old_dark_mode = self.settings.dark_mode
-        self.settings.dark_mode = self.dark_mode_checkbox.isChecked()
-        
-        # Apply theme if changed
-        if old_dark_mode != self.settings.dark_mode:
-            self.apply_theme()
-        
-        # Save settings
-        self.settings.save()
-        
-        # Update status
-        self.status_bar.showMessage("Settings updated")
-        self.feedback_message.show_message("Settings updated", FeedbackMessage.SUCCESS)
 
     def apply_theme(self):
         """Apply the selected theme."""
@@ -3583,6 +3570,15 @@ class MainWindow(QMainWindow):
             # Use default light palette
             QApplication.instance().setStyleSheet("")
             self.setPalette(QApplication.style().standardPalette())
+
+    def open_settings_dialog(self):
+        """Show the settings dialog."""
+        self.settings_dialog.exec()
+
+    def show_about_dialog(self):
+        """Display about information."""
+        QMessageBox.about(self, f"{APP_NAME} v{APP_VERSION}",
+                          f"{APP_NAME} v{APP_VERSION}\nPowered by yt-dlp and created by lolitemaultes")
 
     def scan_music_library(self):
         """Scan music library and display in the library tab."""
@@ -3772,28 +3768,6 @@ class MainWindow(QMainWindow):
         else:
             self.feedback_message.show_message("Log file not found", FeedbackMessage.ERROR)
 
-    def clear_cache(self):
-        """Clear the thumbnail cache."""
-        try:
-            # Count files before clearing
-            files_count = len(os.listdir(CACHE_DIR))
-            
-            # Remove files
-            for file_name in os.listdir(CACHE_DIR):
-                file_path = os.path.join(CACHE_DIR, file_name)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-            
-            # Update status
-            self.status_bar.showMessage(f"Cleared {files_count} cache files")
-            self.feedback_message.show_message(f"Cleared {files_count} cache files", FeedbackMessage.SUCCESS)
-            
-            # Update cache size label
-            self.cache_size_label.setText(f"Current cache size: {CacheManager.get_cache_size():.2f}MB")
-            
-        except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
-            self.feedback_message.show_message(f"Error clearing cache: {str(e)}", FeedbackMessage.ERROR)
 
     def clear_layout(self, layout):
         """Clear all widgets from a layout."""
@@ -3833,66 +3807,75 @@ class MainWindow(QMainWindow):
             self.tabs.setCurrentIndex(current - 1)
         else:
             self.tabs.setCurrentIndex(self.tabs.count() - 1)
-
     def closeEvent(self, event):
         """Handle window close event."""
+        # Bypass tray minimization if a full exit was requested
         if getattr(self, 'exit_requested', False):
             self.download_manager.shutdown()
             event.accept()
             return
 
+        # If tray icon is enabled and window is being closed to tray
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible() and not QApplication.instance().isSavingSession():
+            # Check if there are active downloads
             if self.download_manager.active_downloads:
-                box = QMessageBox(self)
-                box.setWindowTitle("Active Downloads")
-                box.setText("Downloads are still running. Quit the application or minimize to tray?")
-                quit_btn = box.addButton("Quit", QMessageBox.ButtonRole.AcceptRole)
-                tray_btn = box.addButton("Minimize to Tray", QMessageBox.ButtonRole.DestructiveRole)
-                box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-                box.setDefaultButton(tray_btn)
-                box.exec()
+                # Ask the user if they want to close or minimize to tray
+                reply = QMessageBox.question(
+                    self,
+                    "Active Downloads",
+                    "There are active downloads. What would you like to do?",
+                    QMessageBox.StandardButton.Close | QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Minimize,
+                    QMessageBox.StandardButton.Minimize,
+                )
 
-                clicked = box.clickedButton()
-                if clicked == quit_btn:
-                    self.exit_requested = True
+                if reply == QMessageBox.StandardButton.Close:
+                    # Shutdown the download manager
                     self.download_manager.shutdown()
+
+                    # Accept the event
                     event.accept()
-                    return
-                elif clicked == tray_btn:
+                elif reply == QMessageBox.StandardButton.Minimize:
+                    # Minimize to tray
                     self.hide()
                     if hasattr(self, 'show_action'):
                         self.show_action.setText('Show')
+                    event.ignore()
+
+                    # Show tray message if not already shown
                     if not hasattr(self, 'tray_message_shown'):
                         self.tray_icon.showMessage(
                             "YouTube Music Downloader",
                             "Application minimized to system tray. Downloads will continue in the background.",
                             QSystemTrayIcon.MessageIcon.Information,
-                            3000
+                            3000,
                         )
                         self.tray_message_shown = True
-                    event.ignore()
-                    return
                 else:
+                    # Cancel
                     event.ignore()
-                    return
             else:
+                # No active downloads, just minimize to tray
                 self.hide()
                 if hasattr(self, 'show_action'):
                     self.show_action.setText('Show')
+                event.ignore()
+
+                # Show tray message if not already shown
                 if not hasattr(self, 'tray_message_shown'):
                     self.tray_icon.showMessage(
                         "YouTube Music Downloader",
                         "Application minimized to system tray.",
                         QSystemTrayIcon.MessageIcon.Information,
-                        3000
+                        3000,
                     )
                     self.tray_message_shown = True
-                event.ignore()
-                return
+        else:
+            # Shutdown the download manager
+            self.download_manager.shutdown()
 
-        self.exit_requested = True
-        self.download_manager.shutdown()
-        event.accept()
+            # Accept the event
+            event.accept()
+
 
 
 # Utility functions
