@@ -53,7 +53,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QRadioButton, QButtonGroup, QToolButton, QSystemTrayIcon,
                             QSizePolicy, QGraphicsOpacityEffect, QTableWidget,
                             QTableWidgetItem, QHeaderView, QTextEdit, QColorDialog,
-                            QWizard, QWizardPage, QStackedWidget, QStyle)
+                            QWizard, QWizardPage, QStackedWidget, QStyle,
+                            QDialogButtonBox)
 
 # Add qtawesome for better icons
 try:
