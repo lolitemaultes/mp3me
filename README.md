@@ -13,6 +13,11 @@ MP3ME is a user-friendly tool that helps you search and download your favourite 
 
 ✨ Improved stability and performance
 
+### New in this version
+
+* Customisable accent colour in the settings
+* Quick access to the application log file
+
 
 ## 🚀 Release Timeline
 
