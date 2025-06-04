@@ -1,0 +1,6 @@
+PyQt6
+requests
+ytmusicapi
+qtawesome
+mutagen
+yt-dlp
