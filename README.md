@@ -15,7 +15,7 @@ MP3ME is a user-friendly tool that helps you search and download your favourite 
 
 ### New in this version
 
-* Customisable accent colour in the settings
+* Sleek dark theme with a customisable accent colour
 * Quick access to the application log file
 * Official album art is embedded in downloaded songs when available
 

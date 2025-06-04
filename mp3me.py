@@ -154,100 +154,89 @@ class DarkTheme:
     def _create_default_stylesheet(file_path):
         """Create a default stylesheet if none exists."""
         style = """
-        /* Modern Dark Theme */
+        /* Sleek Dark Theme */
 
         QMainWindow, QDialog, QWidget {
-            background-color: #121212;
-            color: #e0e0e0;
+            background-color: #202020;
+            color: #e5e5e5;
             font-family: "Segoe UI", Arial, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         QFrame, QGroupBox {
-            border: 1px solid #292929;
-            border-radius: 8px;
-            padding: 8px;
+            border: 1px solid #333333;
+            border-radius: 6px;
+            padding: 6px;
         }
 
         QTabWidget::pane {
-            border: 1px solid #292929;
-            padding: 10px;
-            border-radius: 8px;
-            background-color: #1a1a1a;
+            border: 1px solid #333333;
+            border-radius: 6px;
+            padding: 6px;
+            background-color: #272727;
         }
 
         QTabBar::tab {
-            background-color: #1e1e1e;
+            background: #333333;
             color: #aaaaaa;
-            padding: 8px 16px;
-            margin-right: 2px;
+            padding: 6px 12px;
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
         }
 
         QTabBar::tab:selected {
-            background-color: #272727;
+            background: {ACCENT_COLOR};
             color: #ffffff;
-            border-bottom: 2px solid {ACCENT_COLOR};
         }
 
         QPushButton {
-            background-color: {ACCENT_COLOR};
+            background: {ACCENT_COLOR};
             color: #ffffff;
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 4px;
         }
 
-        QPushButton:hover {
-            background-color: {ACCENT_LIGHT};
-        }
-
-        QPushButton:pressed {
-            background-color: {ACCENT_DARK};
-        }
+        QPushButton:hover { background: {ACCENT_LIGHT}; }
+        QPushButton:pressed { background: {ACCENT_DARK}; }
 
         QLineEdit, QComboBox, QTextEdit {
-            background-color: #1e1e1e;
-            color: #e0e0e0;
-            border: 1px solid #3c3c3c;
+            background: #2e2e2e;
+            color: #e5e5e5;
+            border: 1px solid #444444;
             border-radius: 4px;
-            padding: 4px 6px;
+            padding: 4px;
             selection-background-color: {ACCENT_COLOR};
         }
 
         QScrollBar:vertical, QScrollBar:horizontal {
-            background: #1e1e1e;
+            background: #2e2e2e;
             width: 8px;
-            margin: 0px;
         }
 
         QScrollBar::handle {
-            background: #444444;
+            background: #555555;
             border-radius: 4px;
         }
 
-        QScrollBar::handle:hover {
-            background: {ACCENT_COLOR};
-        }
+        QScrollBar::handle:hover { background: {ACCENT_COLOR}; }
 
         QProgressBar {
-            background-color: #1e1e1e;
-            border-radius: 4px;
-            text-align: center;
+            background: #2e2e2e;
             color: #ffffff;
+            border-radius: 4px;
         }
 
         QProgressBar::chunk {
-            background-color: {ACCENT_COLOR};
+            background: {ACCENT_COLOR};
             border-radius: 4px;
         }
 
         QCheckBox::indicator {
-            width: 16px;
-            height: 16px;
-            border: 1px solid #3c3c3c;
+            width: 14px;
+            height: 14px;
+            border: 1px solid #444444;
             border-radius: 3px;
-            background: #1e1e1e;
+            background: #2e2e2e;
         }
 
         QCheckBox::indicator:checked {
@@ -256,13 +245,13 @@ class DarkTheme:
         }
 
         QTableWidget {
-            background-color: #121212;
-            alternate-background-color: #1a1a1a;
-            border: 1px solid #292929;
+            background: #202020;
+            alternate-background-color: #272727;
+            border: 1px solid #333333;
         }
 
         QTableWidget::item:selected {
-            background-color: {ACCENT_COLOR};
+            background: {ACCENT_COLOR};
             color: #ffffff;
         }
         """
