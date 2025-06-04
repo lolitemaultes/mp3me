@@ -4464,12 +4464,42 @@ def fetch_better_release_artwork(release_title, artist_name):
     Falls back to YouTube thumbnail if not found.
     """
     try:
-        # For now just return None - this would be implemented with actual
-        # cover art API in a production version
-        return None
+        # Build query for iTunes Search API
+        query = f"{release_title} {artist_name}"
+        params = {
+            "term": query,
+            "entity": "album",
+            "limit": 5
+        }
+
+        response = NetworkManager.request_with_retry(
+            "https://itunes.apple.com/search", params=params, timeout=10
+        )
+        if response.status_code != 200:
+            return None
+
+        results = response.json().get("results", [])
+        release_lower = release_title.lower()
+        artist_lower = artist_name.lower()
+
+        for r in results:
+            album = r.get("collectionName", "").lower()
+            artist = r.get("artistName", "").lower()
+            if release_lower in album and artist_lower in artist:
+                artwork = r.get("artworkUrl100")
+                if artwork:
+                    return artwork.replace("100x100bb", "600x600bb")
+
+        # Fallback to first result if nothing matches perfectly
+        if results:
+            artwork = results[0].get("artworkUrl100")
+            if artwork:
+                return artwork.replace("100x100bb", "600x600bb")
+
     except Exception as e:
         logger.warning(f"Failed to fetch better release art: {e}")
-        return None
+
+    return None
 
 
 def fetch_artist_details(artist_url, artist_id):
