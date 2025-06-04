@@ -803,7 +803,11 @@ class DownloadManager:
         self.signals = signals
         self.download_queue = {}  # Dictionary of downloads by ID
         self.active_downloads = set()  # Set of active download IDs
+        # Executor used for high level download tasks (artists, releases, etc.)
         self.executor = ThreadPoolExecutor(max_workers=settings.threads)
+        # Separate executor for individual song downloads to avoid blocking the
+        # main executor when downloading multiple tracks concurrently
+        self.song_executor = ThreadPoolExecutor(max_workers=settings.threads)
         self.lock = threading.Lock()  # Lock for thread-safe operations on shared data
         self.running = True  # Flag to control the download manager thread
         
@@ -1111,15 +1115,23 @@ class DownloadManager:
             duplicate_found = self._check_file_exists(song, output_dir, download_item.format)
         
         if duplicate_found or os.path.exists(output_path):
-            # File already exists, skip download but mark as complete
+            # File already exists, treat as a completed download
             logger.info(f"Skipping download of {song.title} - file already exists")
             with self.lock:
                 if download_id in self.download_queue:
-                    self.download_queue[download_id].progress = 100.0
+                    item_type = self.download_queue[download_id].item.type
                     self.download_queue[download_id].completed_songs += 1
-                    self.download_queue[download_id].status = DownloadStatus.COMPLETED
-                    self.signals.download_progress.emit(download_id, 100.0, f"Already exists: {song.title}")
-                    self.signals.download_status_changed.emit(download_id, DownloadStatus.COMPLETED, "")
+                    if item_type == ContentType.SONG:
+                        self.download_queue[download_id].progress = 100.0
+                        self.download_queue[download_id].status = DownloadStatus.COMPLETED
+                        progress_value = 100.0
+                        self.signals.download_status_changed.emit(download_id, DownloadStatus.COMPLETED, "")
+                    else:
+                        total = self.download_queue[download_id].total_songs
+                        completed = self.download_queue[download_id].completed_songs
+                        progress_value = (completed / total) * 100 if total else 0
+                        self.download_queue[download_id].progress = progress_value
+                    self.signals.download_progress.emit(download_id, progress_value, f"Already exists: {song.title}")
             return output_path
         
         # Check for cancellation
@@ -1293,19 +1305,26 @@ class DownloadManager:
         # Mark as completed
         with self.lock:
             if download_id in self.download_queue:
-                self.download_queue[download_id].progress = 100.0
+                item_type = self.download_queue[download_id].item.type
                 self.download_queue[download_id].completed_songs += 1
-                
-                # If this is a single song download (not part of release/artist)
-                if self.download_queue[download_id].item.type == ContentType.SONG:
+
+                if item_type == ContentType.SONG:
+                    # Single track download
+                    self.download_queue[download_id].progress = 100.0
                     self.download_queue[download_id].status = DownloadStatus.COMPLETED
                     self.signals.download_status_changed.emit(
                         download_id, DownloadStatus.COMPLETED, ""
                     )
-                    
-                # Update progress
+                    progress_value = 100.0
+                else:
+                    total = self.download_queue[download_id].total_songs
+                    completed = self.download_queue[download_id].completed_songs
+                    progress_value = (completed / total) * 100 if total else 0
+                    self.download_queue[download_id].progress = progress_value
+
+                # Update progress message
                 self.signals.download_progress.emit(
-                    download_id, 100.0, f"Completed: {song.title}"
+                    download_id, progress_value, f"Completed: {song.title}"
                 )
         
         return output_path
@@ -1437,60 +1456,59 @@ class DownloadManager:
         if not selected_songs:
             selected_songs = release.songs
         
-        # Download each song
+        # Download each song using a separate executor to allow concurrency
         success_count = 0
         error_messages = []
-        
+        futures = {}
+
         for song in selected_songs:
             # Check for cancellation
             with self.lock:
-                if (download_id in self.download_queue and 
+                if (download_id in self.download_queue and
                     self.download_queue[download_id].status == DownloadStatus.CANCELLED):
                     self.signals.download_status_changed.emit(download_id, DownloadStatus.CANCELLED, "")
                     return
-            
-            # Make sure song has album information
+
+            # Ensure song has correct metadata
             if not song.album:
                 song.album = release.title
             if not song.artist:
                 song.artist = release.artist
             if not song.year:
                 song.year = release.year
-            
+
+            # Fix placeholder URLs
+            if "watch?v=song_" in song.url:
+                if song.video_id:
+                    song.url = f"https://music.youtube.com/watch?v={song.video_id}"
+                else:
+                    logger.warning(f"Skipping track with invalid URL: {song.title}")
+                    continue
+
+            with self.lock:
+                if download_id in self.download_queue:
+                    self.download_queue[download_id].current_song = song
+                    completed = self.download_queue[download_id].completed_songs
+                    total = self.download_queue[download_id].total_songs
+                    overall_progress = (completed / total) * 100 if total > 0 else 0
+                    self.signals.download_progress.emit(
+                        download_id, overall_progress,
+                        f"Downloading {completed+1}/{total}: {song.title}"
+                    )
+
+            logger.info(f"Downloading song: {song.title} (URL: {song.url})")
+            futures[self.song_executor.submit(self._download_song, download_id, download_item, song)] = song
+
+        for future in as_completed(futures):
+            song = futures[future]
             try:
-                # Some tracks might not have valid URLs if they were created as placeholders
-                if "watch?v=song_" in song.url:
-                    if song.video_id:
-                        song.url = f"https://music.youtube.com/watch?v={song.video_id}"
-                    else:
-                        logger.warning(f"Skipping track with invalid URL: {song.title}")
-                        continue
-                    
-                # Update current song
-                with self.lock:
-                    if download_id in self.download_queue:
-                        self.download_queue[download_id].current_song = song
-                        # Calculate overall progress
-                        completed = self.download_queue[download_id].completed_songs
-                        total = self.download_queue[download_id].total_songs
-                        overall_progress = (completed / total) * 100 if total > 0 else 0
-                        self.signals.download_progress.emit(
-                            download_id, overall_progress, 
-                            f"Downloading {completed+1}/{total}: {song.title}"
-                        )
-                
-                logger.info(f"Downloading song: {song.title} (URL: {song.url})")
-                
-                # Download the song
-                output_path = self._download_song(download_id, download_item, song)
+                output_path = future.result()
                 if output_path:
                     success_count += 1
-            
             except Exception as e:
                 error_msg = f"Error downloading {song.title}: {str(e)}"
                 logger.error(error_msg)
                 error_messages.append(error_msg)
-                continue
         
         # Update status based on results
         with self.lock:
@@ -1630,8 +1648,9 @@ class DownloadManager:
             for download_id in list(self.active_downloads):
                 self.cancel_download(download_id)
         
-        # Shutdown the executor
+        # Shutdown executors
         self.executor.shutdown(wait=False)
+        self.song_executor.shutdown(wait=False)
         
         # Wait for manager thread to exit
         if self.manager_thread.is_alive():
