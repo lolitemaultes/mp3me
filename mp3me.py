@@ -154,39 +154,39 @@ class DarkTheme:
     def _create_default_stylesheet(file_path):
         """Create a default stylesheet if none exists."""
         style = """
-        /* Sleek Dark Theme */
+        /* Modern Dark Theme */
 
         QMainWindow, QDialog, QWidget {
-            background-color: #1d1f21;
-            color: #eeeeee;
-            font-family: "Segoe UI", "SF Pro Text", Arial, sans-serif;
-            font-size: 12px;
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            font-size: 13px;
         }
 
         QFrame, QGroupBox {
-            border: 1px solid #2a2c2e;
-            border-radius: 6px;
-            padding: 6px;
+            border: 1px solid #292929;
+            border-radius: 8px;
+            padding: 8px;
         }
 
         QTabWidget::pane {
-            border: 1px solid #2a2c2e;
-            padding: 8px;
-            border-radius: 6px;
-            background-color: #161718;
+            border: 1px solid #292929;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #1a1a1a;
         }
 
         QTabBar::tab {
-            background-color: #202224;
-            color: #bbbbbb;
-            padding: 8px 20px;
+            background-color: #1e1e1e;
+            color: #aaaaaa;
+            padding: 8px 16px;
             margin-right: 2px;
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
         }
 
         QTabBar::tab:selected {
-            background-color: #27292b;
+            background-color: #272727;
             color: #ffffff;
             border-bottom: 2px solid {ACCENT_COLOR};
         }
@@ -194,8 +194,7 @@ class DarkTheme:
         QPushButton {
             background-color: {ACCENT_COLOR};
             color: #ffffff;
-            padding: 6px 14px;
-            border: none;
+            padding: 6px 12px;
             border-radius: 4px;
         }
 
@@ -208,35 +207,34 @@ class DarkTheme:
         }
 
         QLineEdit, QComboBox, QTextEdit {
-            background-color: #2a2c2e;
-            color: #eeeeee;
-            border: 1px solid #444444;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: 1px solid #3c3c3c;
             border-radius: 4px;
-            padding: 4px 8px;
+            padding: 4px 6px;
             selection-background-color: {ACCENT_COLOR};
         }
 
         QScrollBar:vertical, QScrollBar:horizontal {
-            background-color: #1e1f21;
+            background: #1e1e1e;
             width: 8px;
-            margin: 0;
+            margin: 0px;
         }
 
         QScrollBar::handle {
-            background-color: #444444;
+            background: #444444;
             border-radius: 4px;
         }
 
         QScrollBar::handle:hover {
-            background-color: {ACCENT_COLOR};
+            background: {ACCENT_COLOR};
         }
 
         QProgressBar {
-            background-color: #2a2c2e;
-            border: none;
+            background-color: #1e1e1e;
+            border-radius: 4px;
             text-align: center;
             color: #ffffff;
-            border-radius: 4px;
         }
 
         QProgressBar::chunk {
@@ -247,20 +245,20 @@ class DarkTheme:
         QCheckBox::indicator {
             width: 16px;
             height: 16px;
-            border: 1px solid #444444;
+            border: 1px solid #3c3c3c;
             border-radius: 3px;
-            background-color: #2a2c2e;
+            background: #1e1e1e;
         }
 
         QCheckBox::indicator:checked {
-            background-color: {ACCENT_COLOR};
+            background: {ACCENT_COLOR};
             border-color: {ACCENT_COLOR};
         }
 
         QTableWidget {
-            background-color: #1d1f21;
-            alternate-background-color: #222222;
-            border: 1px solid #2a2c2e;
+            background-color: #121212;
+            alternate-background-color: #1a1a1a;
+            border: 1px solid #292929;
         }
 
         QTableWidget::item:selected {
@@ -866,6 +864,15 @@ class DownloadManager:
                 song.url = f"https://music.youtube.com/watch?v={song.video_id}"
             else:
                 raise Exception(f"Invalid YouTube URL for {song.title}")
+
+        # Ensure we have high quality album art
+        if not song.thumbnail_url or "googleusercontent" in song.thumbnail_url:
+            try:
+                better = fetch_better_release_artwork(song.album or song.title, song.artist)
+                if better:
+                    song.thumbnail_url = better
+            except Exception:
+                pass
         
         # Update current song
         with self.lock:
@@ -3829,39 +3836,32 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
-        # Bypass tray minimization if a full exit was requested
         if getattr(self, 'exit_requested', False):
             self.download_manager.shutdown()
             event.accept()
             return
 
-        # If tray icon is enabled and window is being closed to tray
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible() and not QApplication.instance().isSavingSession():
-            # Check if there are active downloads
             if self.download_manager.active_downloads:
-                # Ask the user if they want to close or minimize to tray
-                reply = QMessageBox.question(
-                    self,
-                    "Active Downloads", 
-                    "There are active downloads. What would you like to do?",
-                    QMessageBox.StandardButton.Close | QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Minimize,
-                    QMessageBox.StandardButton.Minimize
-                )
-                
-                if reply == QMessageBox.StandardButton.Close:
-                    # Shutdown the download manager
+                box = QMessageBox(self)
+                box.setWindowTitle("Active Downloads")
+                box.setText("Downloads are still running. Quit the application or minimize to tray?")
+                quit_btn = box.addButton("Quit", QMessageBox.ButtonRole.AcceptRole)
+                tray_btn = box.addButton("Minimize to Tray", QMessageBox.ButtonRole.DestructiveRole)
+                box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+                box.setDefaultButton(tray_btn)
+                box.exec()
+
+                clicked = box.clickedButton()
+                if clicked == quit_btn:
+                    self.exit_requested = True
                     self.download_manager.shutdown()
-                    
-                    # Accept the event
                     event.accept()
-                elif reply == QMessageBox.StandardButton.Minimize:
-                    # Minimize to tray
+                    return
+                elif clicked == tray_btn:
                     self.hide()
                     if hasattr(self, 'show_action'):
                         self.show_action.setText('Show')
-                    event.ignore()
-                    
-                    # Show tray message if not already shown
                     if not hasattr(self, 'tray_message_shown'):
                         self.tray_icon.showMessage(
                             "YouTube Music Downloader",
@@ -3870,17 +3870,15 @@ class MainWindow(QMainWindow):
                             3000
                         )
                         self.tray_message_shown = True
-                else:
-                    # Cancel
                     event.ignore()
+                    return
+                else:
+                    event.ignore()
+                    return
             else:
-                # No active downloads, just minimize to tray
                 self.hide()
                 if hasattr(self, 'show_action'):
                     self.show_action.setText('Show')
-                event.ignore()
-                
-                # Show tray message if not already shown
                 if not hasattr(self, 'tray_message_shown'):
                     self.tray_icon.showMessage(
                         "YouTube Music Downloader",
@@ -3889,12 +3887,12 @@ class MainWindow(QMainWindow):
                         3000
                     )
                     self.tray_message_shown = True
-        else:
-            # Shutdown the download manager
-            self.download_manager.shutdown()
+                event.ignore()
+                return
 
-            # Accept the event
-            event.accept()
+        self.exit_requested = True
+        self.download_manager.shutdown()
+        event.accept()
 
 
 # Utility functions
